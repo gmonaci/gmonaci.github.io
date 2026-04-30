@@ -177,11 +177,19 @@ def _year_group_html(year: int, entries: list, indent: str = "    ") -> list[str
 
 def render_publications_html(publications: list[dict], urls: list[str]) -> str:
     n = min(len(publications), len(urls))
+
+    # Index assignment: oldest eligible paper = pub_01, newest = pub_NN.
+    # Publications arrive newest-first, so position 0 = newest → highest idx.
+    thumb_eligible = [i for i in range(n) if publications[i]["year"] >= THUMB_FROM_YEAR]
+    total_thumb    = len(thumb_eligible)
+    thumb_idx      = {i: total_thumb - pos for pos, i in enumerate(thumb_eligible)}
+
     groups: dict[int, list] = defaultdict(list)
     for i in range(n):
-        groups[publications[i]["year"]].append((i + 1, publications[i], urls[i]))
+        idx = thumb_idx.get(i, 0)
+        groups[publications[i]["year"]].append((idx, publications[i], urls[i]))
     for i in range(n, len(publications)):
-        groups[publications[i]["year"]].append((i + 1, publications[i], "#"))
+        groups[publications[i]["year"]].append((0, publications[i], "#"))
 
     recent_years = sorted((y for y in groups if y >= HIDE_BEFORE_YEAR), reverse=True)
     old_years    = sorted((y for y in groups if y <  HIDE_BEFORE_YEAR), reverse=True)
@@ -241,27 +249,38 @@ def inject_into_html(html_path: Path, pub_html: str) -> None:
 def write_overrides_readme(pubs: list[dict], urls: list[str], out_path: Path) -> None:
     """Write figures/overrides/README.md — the override reference guide."""
     n = min(len(pubs), len(urls))
+
+    # Same index scheme as render_publications_html: oldest = pub_01, newest = pub_NN.
+    thumb_eligible = [i for i in range(n) if pubs[i]["year"] >= THUMB_FROM_YEAR]
+    total_thumb    = len(thumb_eligible)
+    thumb_idx      = {i: total_thumb - pos for pos, i in enumerate(thumb_eligible)}
+
     lines = [
         "# Figure overrides",
         "",
-        "Drop a replacement image here named **`pub_NN.jpg`** to override the",
-        "auto-fetched thumbnail for that paper.  The workflow picks it up on",
-        "the next run (no `--force` needed — overrides always win).",
+        "Drop a replacement image here named **`pub_NN.<ext>`** to override the",
+        "auto-fetched thumbnail for that paper.  Any common image format works",
+        "(`.jpg`, `.jpeg`, `.png`, `.webp`, …).  The image will be automatically",
+        "cropped/resized to the standard thumbnail size.",
+        "",
+        "The workflow picks it up on the next run — no `--force` needed, overrides always win.",
+        "",
+        "**Numbering:** `pub_01` = oldest paper with a thumbnail, "
+        f"`pub_{total_thumb:02d}` = newest.  "
+        "Adding a new publication appends a new highest number; existing filenames never shift.",
         "",
         "## Paper index",
         "",
         "| File | Year | Venue | Title |",
         "| ---- | ---- | ----- | ----- |",
     ]
-    for i in range(n):
-        pub  = pubs[i]
-        year = pub["year"]
-        if year < THUMB_FROM_YEAR:
-            continue
-        idx   = i + 1
+    # Show oldest-first in the table so numbering is intuitive
+    for i in reversed(thumb_eligible):
+        pub   = pubs[i]
+        idx   = thumb_idx[i]
         title = pub["title"].replace("|", "\\|")
         venue = pub["venue"].replace("|", "\\|")
-        lines.append(f"| `pub_{idx:02d}.jpg` | {year} | {venue} | {title} |")
+        lines.append(f"| `pub_{idx:02d}.jpg` | {pub['year']} | {venue} | {title} |")
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

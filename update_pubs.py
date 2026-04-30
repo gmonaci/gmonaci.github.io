@@ -12,9 +12,6 @@ Only the block between
     <!-- PUBLICATIONS_START -->
     <!-- PUBLICATIONS_END -->
 is replaced; everything else (intro text, styling, etc.) is preserved.
-
-After running this script, run fetch_figures.py to download any new paper
-figures (existing figures are skipped automatically).
 """
 
 import re
@@ -135,42 +132,28 @@ def render_publications_html(publications: list[dict], urls: list[str]) -> str:
     n = min(len(publications), len(urls))
     groups: dict[int, list] = defaultdict(list)
     for i in range(n):
-        groups[publications[i]["year"]].append((i + 1, publications[i], urls[i]))
-    # Append any pubs beyond URL list (no link, no figure update)
+        groups[publications[i]["year"]].append((publications[i], urls[i]))
+    # Append any pubs beyond URL list (no link)
     for i in range(n, len(publications)):
-        groups[publications[i]["year"]].append(
-            (i + 1, publications[i], "#")
-        )
+        groups[publications[i]["year"]].append((publications[i], "#"))
 
     parts = []
     for year in sorted(groups.keys(), reverse=True):
         parts.append('    <div class="year-group">')
         parts.append(f'      <div class="year-label">{year}</div>')
-        for idx, p, url in groups[year]:
-            fig = f"figures/pub_{idx:02d}.jpg"
+        for p, url in groups[year]:
             parts.append('      <div class="pub">')
             parts.append(
-                f'        <a class="pub-fig" href="{url}" '
-                f'target="_blank" rel="noopener">'
-            )
-            parts.append(
-                f'          <img src="{fig}" alt="" loading="lazy" '
-                f'width="140" height="90">'
-            )
-            parts.append("        </a>")
-            parts.append('        <div class="pub-body">')
-            parts.append(
-                f'          <div class="pub-title">'
+                f'        <div class="pub-title">'
                 f'<a href="{url}" target="_blank" rel="noopener">'
                 f'{p["title"]}</a>'
                 f'{_badge_html(p["badge"])}</div>'
             )
             parts.append(
-                f'          <div class="pub-authors">'
+                f'        <div class="pub-authors">'
                 f'{_bold_author(p["authors"])}</div>'
             )
-            parts.append(f'          <div class="pub-venue">{p["venue"]}</div>')
-            parts.append("        </div>")
+            parts.append(f'        <div class="pub-venue">{p["venue"]}</div>')
             parts.append("      </div>")
         parts.append("    </div>")
 
@@ -232,8 +215,6 @@ def main() -> None:
     print(f"Updating {html_path} …")
     inject_into_html(html_path, pub_html)
     print("Done.")
-    print()
-    print("Next step: run  python fetch_figures.py  to download new paper figures.")
 
 
 if __name__ == "__main__":

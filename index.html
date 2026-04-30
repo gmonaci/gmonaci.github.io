@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gianluca Monaci</title>
+  <title>Gianluca Monaci — Embodied AI Research</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
@@ -36,7 +36,24 @@
     }
 
     /* ── Header ── */
-    header { margin-bottom: 2.5rem; }
+    header {
+      display: flex;
+      gap: 1.8rem;
+      align-items: flex-start;
+      margin-bottom: 2.5rem;
+    }
+
+    .avatar {
+      flex: 0 0 80px;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-top: 0.25rem;
+      border: 2px solid var(--border);
+    }
+
+    .header-text { flex: 1; }
 
     h1 {
       font-size: 1.9rem;
@@ -47,8 +64,9 @@
 
     .subtitle {
       color: var(--muted);
-      font-size: 0.9rem;
-      margin-bottom: 1.4rem;
+      font-size: 0.82rem;
+      margin-bottom: 1rem;
+      letter-spacing: 0.03em;
     }
 
     .links { display: flex; gap: 0.6rem; flex-wrap: wrap; }
@@ -112,7 +130,7 @@
 
     .pub-title {
       font-size: 0.88rem;
-      font-weight: 500;
+      font-weight: 600;
       line-height: 1.45;
       margin-bottom: 0.3rem;
     }
@@ -213,6 +231,8 @@
     @media (max-width: 560px) {
       h1 { font-size: 1.5rem; }
       .container { padding: 3rem 1.1rem 5rem; }
+      header { gap: 1.1rem; }
+      .avatar { width: 64px; height: 64px; flex: 0 0 64px; }
     }
   </style>
 </head>
@@ -220,11 +240,15 @@
 <div class="container">
 
   <header>
-    <h1>Gianluca Monaci</h1>
-    <p class="subtitle">Senior Scientist &middot; Naver Labs Europe &middot; Grenoble, France</p>
-    <div class="links">
-      <a href="cv.pdf">CV &darr;</a>
-      <a href="https://www.linkedin.com/in/gmonaci/" target="_blank" rel="noopener">LinkedIn &nearr;</a>
+    <img class="avatar" src="avatar.jpg" alt="Gianluca Monaci">
+    <div class="header-text">
+      <h1>Gianluca Monaci</h1>
+      <p class="subtitle">Robotics &middot; Computer Vision &middot; Embodied AI</p>
+      <div class="links">
+        <a href="cv.pdf">CV &darr;</a>
+        <a href="https://www.linkedin.com/in/gmonaci/" target="_blank" rel="noopener">LinkedIn &nearr;</a>
+        <a href="https://scholar.google.com/citations?user=t7MzKqIAAAAJ&hl=en" target="_blank" rel="noopener">Scholar &nearr;</a>
+      </div>
     </div>
   </header>
 
@@ -233,7 +257,8 @@
       INTRO: replace the paragraph below with your bio.
       It will NOT be touched by update_pubs.py.
     -->
-    <p>I am a Senior Scientist and Project Lead at <a href="https://europe.naverlabs.com" target="_blank" rel="noopener">Naver Labs Europe</a>, where I lead research in Embodied AI with a focus on end-to-end learning and vision-based approaches for robot navigation. My work spans reinforcement learning, computer vision, and autonomous systems. Previously I was Laboratory Manager at Xerox Research Center Europe and Senior Scientist at Philips Research. I hold a PhD from EPFL and was a PostDoc at the Redwood Center for Theoretical Neuroscience, UC Berkeley.</p>
+    <p>I lead research in Embodied AI at <a href="https://europe.naverlabs.com" target="_blank" rel="noopener">Naver Labs Europe</a>, building end-to-end systems that let robots see, reason, and navigate the real world. My work sits at the intersection of reinforcement learning, computer vision, and autonomous systems.</p>
+    <p style="margin-top:0.7rem;">Before Naver Labs I held research positions at Xerox Research Center Europe and Philips Research. I did my PhD at EPFL and a postdoc at the Redwood Center for Theoretical Neuroscience, UC Berkeley.</p>
   </section>
 
   <section class="publications">

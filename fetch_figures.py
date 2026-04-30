@@ -290,20 +290,23 @@ def make_placeholder(pub):
 # ── CLI ───────────────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="Fetch paper thumbnails")
-    parser.add_argument("--cv",    default="cv.pdf")
-    parser.add_argument("--out",   default="figures")
-    parser.add_argument("--force", action="store_true", help="Re-download existing")
+    parser.add_argument("--cv",        default="cv.pdf")
+    parser.add_argument("--out",       default="figures")
+    parser.add_argument("--overrides", default="figures/overrides",
+                        help="Folder of manually-supplied images (pub_NN.jpg)")
+    parser.add_argument("--force",     action="store_true", help="Re-fetch even if file exists")
     args = parser.parse_args()
 
-    cv_path = Path(args.cv)
-    out_dir = Path(args.out)
+    cv_path      = Path(args.cv)
+    out_dir      = Path(args.out)
+    overrides_dir = Path(args.overrides)
     out_dir.mkdir(exist_ok=True)
 
     pubs = extract_publications(cv_path)
     urls = extract_pub_urls(cv_path)
     n    = min(len(pubs), len(urls))
 
-    real = placeholder = skipped = 0
+    real = placeholder = skipped = overridden = 0
 
     for i in range(n):
         pub  = pubs[i]
@@ -314,7 +317,18 @@ def main():
         if year < THUMB_FROM_YEAR:
             continue
 
-        dst = out_dir / f"pub_{idx:02d}.jpg"
+        dst      = out_dir / f"pub_{idx:02d}.jpg"
+        override = overrides_dir / f"pub_{idx:02d}.jpg"
+
+        # ── manual override wins unconditionally ──────────────────────────────
+        if override.exists():
+            import shutil
+            shutil.copy2(override, dst)
+            print(f"[{idx:02d}] override  {year}  {pub['title'][:55]}")
+            overridden += 1
+            continue
+
+        # ── skip if already fetched (unless --force) ──────────────────────────
         if dst.exists() and not args.force:
             print(f"[{idx:02d}] skip  {year}  {pub['title'][:55]}")
             skipped += 1
@@ -334,7 +348,7 @@ def main():
 
         time.sleep(1.5)   # polite pause between papers
 
-    print(f"\nDone: {real} real  |  {placeholder} placeholder  |  {skipped} skipped")
+    print(f"\nDone: {overridden} override  |  {real} fetched  |  {placeholder} placeholder  |  {skipped} skipped")
 
 
 if __name__ == "__main__":

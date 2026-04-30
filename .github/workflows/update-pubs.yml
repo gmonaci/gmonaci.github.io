@@ -22,21 +22,16 @@ jobs:
           python-version: '3.11'
 
       - name: Install Python dependencies
-        run: pip install pdfplumber pdf2image requests Pillow pypdf
-
-      - name: Install poppler (needed by pdf2image)
-        run: sudo apt-get install -y poppler-utils
+        run: pip install pdfplumber
 
       - name: Regenerate publications section in index.html
         run: python update_pubs.py --cv cv.pdf --html index.html
-
-      - name: Fetch figures for new publications (skips existing)
-        run: python fetch_figures.py --cv cv.pdf --out figures
 
       - name: Commit changes
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add index.html figures/
-          git diff --cached --quiet || git commit -m "chore: update publications and figures from cv.pdf [skip ci]"
+          git rm -r --cached figures/ --ignore-unmatch
+          git add index.html
+          git diff --cached --quiet || git commit -m "chore: update publications from cv.pdf [skip ci]"
           git push

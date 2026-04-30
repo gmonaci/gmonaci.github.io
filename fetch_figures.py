@@ -318,10 +318,12 @@ def main():
     OVERRIDE_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif"]
 
     def find_override(idx: int) -> Path | None:
-        for ext in OVERRIDE_EXTS:
-            p = overrides_dir / f"pub_{idx:02d}{ext}"
-            if p.exists():
-                return p
+        # Accept both zero-padded (pub_03.png) and plain (pub_3.png)
+        for name in [f"pub_{idx:02d}", f"pub_{idx}"]:
+            for ext in OVERRIDE_EXTS:
+                p = overrides_dir / f"{name}{ext}"
+                if p.exists():
+                    return p
         return None
 
     real = placeholder = skipped = overridden = 0

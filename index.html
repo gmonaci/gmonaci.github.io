@@ -178,6 +178,33 @@
       letter-spacing: 0.01em;
     }
 
+    /* ── Publication thumbnail ── */
+    .pub-has-thumb {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .pub-thumb {
+      flex: 0 0 140px;
+      display: block;
+      border-radius: 5px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      transition: opacity 0.15s;
+    }
+
+    .pub-thumb:hover { opacity: 0.82; }
+
+    .pub-thumb img {
+      display: block;
+      width: 140px;
+      height: 90px;
+      object-fit: cover;
+    }
+
+    .pub-body { flex: 1; min-width: 0; }
+
     /* ── Older publications toggle ── */
     .older-pubs {
       margin-top: 1.5rem;
@@ -233,6 +260,9 @@
       .container { padding: 3rem 1.1rem 5rem; }
       header { gap: 1.1rem; }
       .avatar { width: 110px; height: 110px; flex: 0 0 110px; }
+      .pub-has-thumb { flex-direction: column; }
+      .pub-thumb { flex: none; width: 100%; }
+      .pub-thumb img { width: 100%; height: auto; }
     }
   </style>
 </head>

@@ -23,7 +23,7 @@ jobs:
       - name: Regenerate publications section in index.html
         run: python update_pubs.py --cv cv.pdf --html index.html
       - name: Fetch figures for publications (2016+)
-        run: python fetch_figures.py --cv cv.pdf --out figures
+        run: python fetch_figures.py --cv cv.pdf --out figures --force
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"

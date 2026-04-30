@@ -236,12 +236,47 @@ def inject_into_html(html_path: Path, pub_html: str) -> None:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+# Overrides reference guide
+# ---------------------------------------------------------------------------
+def write_overrides_readme(pubs: list[dict], urls: list[str], out_path: Path) -> None:
+    """Write figures/overrides/README.md — the override reference guide."""
+    n = min(len(pubs), len(urls))
+    lines = [
+        "# Figure overrides",
+        "",
+        "Drop a replacement image here named **`pub_NN.jpg`** to override the",
+        "auto-fetched thumbnail for that paper.  The workflow picks it up on",
+        "the next run (no `--force` needed — overrides always win).",
+        "",
+        "## Paper index",
+        "",
+        "| File | Year | Venue | Title |",
+        "| ---- | ---- | ----- | ----- |",
+    ]
+    for i in range(n):
+        pub  = pubs[i]
+        year = pub["year"]
+        if year < THUMB_FROM_YEAR:
+            continue
+        idx   = i + 1
+        title = pub["title"].replace("|", "\\|")
+        venue = pub["venue"].replace("|", "\\|")
+        lines.append(f"| `pub_{idx:02d}.jpg` | {year} | {venue} | {title} |")
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Wrote {out_path}")
+
+
+# ---------------------------------------------------------------------------
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Update publications in index.html from cv.pdf"
     )
     parser.add_argument("--cv",   default="cv.pdf",    help="Path to the CV PDF")
     parser.add_argument("--html", default="index.html", help="Path to index.html")
+    parser.add_argument("--overrides-dir", default="figures/overrides",
+                        help="Where to write the override README")
     args = parser.parse_args()
 
     cv_path   = Path(args.cv)
@@ -261,6 +296,8 @@ def main() -> None:
 
     print(f"Updating {html_path} …")
     inject_into_html(html_path, pub_html)
+
+    write_overrides_readme(pubs, urls, Path(args.overrides_dir) / "README.md")
     print("Done.")
 
 

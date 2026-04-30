@@ -128,34 +128,62 @@ def _bold_author(authors: str) -> str:
     )
 
 
+HIDE_BEFORE_YEAR = 2015   # years strictly before this go under the dropdown
+
+
+def _year_group_html(year: int, entries: list, indent: str = "    ") -> list[str]:
+    """Return lines of HTML for a single year group."""
+    i = indent
+    parts = [
+        f'{i}<div class="year-group">',
+        f'{i}  <div class="year-label">{year}</div>',
+    ]
+    for p, url in entries:
+        parts += [
+            f'{i}  <div class="pub">',
+            f'{i}    <div class="pub-title">'
+            f'<a href="{url}" target="_blank" rel="noopener">'
+            f'{p["title"]}</a>'
+            f'{_badge_html(p["badge"])}</div>',
+            f'{i}    <div class="pub-authors">'
+            f'{_bold_author(p["authors"])}</div>',
+            f'{i}    <div class="pub-venue">{p["venue"]}</div>',
+            f'{i}  </div>',
+        ]
+    parts.append(f'{i}</div>')
+    return parts
+
+
 def render_publications_html(publications: list[dict], urls: list[str]) -> str:
     n = min(len(publications), len(urls))
     groups: dict[int, list] = defaultdict(list)
     for i in range(n):
         groups[publications[i]["year"]].append((publications[i], urls[i]))
-    # Append any pubs beyond URL list (no link)
     for i in range(n, len(publications)):
         groups[publications[i]["year"]].append((publications[i], "#"))
 
+    recent_years = sorted((y for y in groups if y >= HIDE_BEFORE_YEAR), reverse=True)
+    old_years    = sorted((y for y in groups if y <  HIDE_BEFORE_YEAR), reverse=True)
+
     parts = []
-    for year in sorted(groups.keys(), reverse=True):
-        parts.append('    <div class="year-group">')
-        parts.append(f'      <div class="year-label">{year}</div>')
-        for p, url in groups[year]:
-            parts.append('      <div class="pub">')
-            parts.append(
-                f'        <div class="pub-title">'
-                f'<a href="{url}" target="_blank" rel="noopener">'
-                f'{p["title"]}</a>'
-                f'{_badge_html(p["badge"])}</div>'
-            )
-            parts.append(
-                f'        <div class="pub-authors">'
-                f'{_bold_author(p["authors"])}</div>'
-            )
-            parts.append(f'        <div class="pub-venue">{p["venue"]}</div>')
-            parts.append("      </div>")
-        parts.append("    </div>")
+
+    # Recent publications — shown by default
+    for year in recent_years:
+        parts += _year_group_html(year, groups[year])
+
+    # Older publications — hidden under a <details> toggle
+    if old_years:
+        old_count = sum(len(groups[y]) for y in old_years)
+        parts.append(
+            f'    <details class="older-pubs">'
+        )
+        parts.append(
+            f'      <summary class="older-pubs-toggle">'
+            f'Earlier publications ({old_count})</summary>'
+        )
+        for year in old_years:
+            parts += _year_group_html(year, groups[year], indent="      ")
+        parts.append("    </details>")
 
     return "\n".join(parts) + "\n"
 

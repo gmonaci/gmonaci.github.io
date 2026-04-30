@@ -293,12 +293,12 @@ def main():
     parser.add_argument("--cv",        default="cv.pdf")
     parser.add_argument("--out",       default="figures")
     parser.add_argument("--overrides", default="figures/overrides",
-                        help="Folder of manually-supplied images (pub_NN.jpg)")
+                        help="Folder of manually-supplied images (pub_NN.{jpg,png,…})")
     parser.add_argument("--force",     action="store_true", help="Re-fetch even if file exists")
     args = parser.parse_args()
 
-    cv_path      = Path(args.cv)
-    out_dir      = Path(args.out)
+    cv_path       = Path(args.cv)
+    out_dir       = Path(args.out)
     overrides_dir = Path(args.overrides)
     out_dir.mkdir(exist_ok=True)
 
@@ -306,26 +306,47 @@ def main():
     urls = extract_pub_urls(cv_path)
     n    = min(len(pubs), len(urls))
 
+    # ── Index assignment: oldest paper = pub_01, newest = pub_NN ─────────────
+    # This way adding a new (recent) paper gets the next number and existing
+    # override filenames never shift.
+    thumb_eligible = [i for i in range(n) if pubs[i]["year"] >= THUMB_FROM_YEAR]
+    total_thumb    = len(thumb_eligible)
+    # pubs are newest-first in the CV, so position 0 = newest → highest index
+    thumb_idx = {i: total_thumb - pos for pos, i in enumerate(thumb_eligible)}
+
+    # Image-format extensions to check in the overrides folder
+    OVERRIDE_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif"]
+
+    def find_override(idx: int) -> Path | None:
+        for ext in OVERRIDE_EXTS:
+            p = overrides_dir / f"pub_{idx:02d}{ext}"
+            if p.exists():
+                return p
+        return None
+
     real = placeholder = skipped = overridden = 0
 
     for i in range(n):
         pub  = pubs[i]
         url  = urls[i]
-        idx  = i + 1
         year = pub["year"]
 
         if year < THUMB_FROM_YEAR:
             continue
 
-        dst      = out_dir / f"pub_{idx:02d}.jpg"
-        override = overrides_dir / f"pub_{idx:02d}.jpg"
+        idx = thumb_idx[i]
+        dst = out_dir / f"pub_{idx:02d}.jpg"
 
         # ── manual override wins unconditionally ──────────────────────────────
-        if override.exists():
-            import shutil
-            shutil.copy2(override, dst)
-            print(f"[{idx:02d}] override  {year}  {pub['title'][:55]}")
-            overridden += 1
+        override_path = find_override(idx)
+        if override_path:
+            try:
+                img = Image.open(override_path)
+                to_thumb(img).save(dst, "JPEG", quality=85, optimize=True)
+                print(f"[{idx:02d}] override ({override_path.suffix})  {year}  {pub['title'][:50]}")
+                overridden += 1
+            except Exception as e:
+                print(f"[{idx:02d}] override error: {e} — skipping")
             continue
 
         # ── skip if already fetched (unless --force) ──────────────────────────
@@ -349,6 +370,7 @@ def main():
         time.sleep(1.5)   # polite pause between papers
 
     print(f"\nDone: {overridden} override  |  {real} fetched  |  {placeholder} placeholder  |  {skipped} skipped")
+    print(f"      (pub_01 = oldest eligible paper, pub_{total_thumb:02d} = newest)")
 
 
 if __name__ == "__main__":

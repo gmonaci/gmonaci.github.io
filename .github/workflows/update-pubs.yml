@@ -3,8 +3,8 @@ name: Update publications from CV
 on:
   push:
     paths:
-      - 'cv.pdf'        # triggers only when the CV is updated
-  workflow_dispatch:    # also allows manual trigger from the Actions tab
+      - 'cv.pdf'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -22,16 +22,21 @@ jobs:
           python-version: '3.11'
 
       - name: Install Python dependencies
-        run: pip install pdfplumber
+        run: pip install pdfplumber pypdf pdf2image Pillow requests
+
+      - name: Install poppler (needed by pdf2image)
+        run: sudo apt-get install -y poppler-utils
 
       - name: Regenerate publications section in index.html
         run: python update_pubs.py --cv cv.pdf --html index.html
+
+      - name: Fetch figures for publications (2016+)
+        run: python fetch_figures.py --cv cv.pdf --out figures
 
       - name: Commit changes
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git rm -r --cached figures/ --ignore-unmatch
-          git add index.html
-          git diff --cached --quiet || git commit -m "chore: update publications from cv.pdf [skip ci]"
+          git add index.html figures/
+          git diff --cached --quiet || git commit -m "chore: update publications and figures from cv.pdf [skip ci]"
           git push

@@ -3,15 +3,16 @@
 fetch_figures.py
 ================
 For each publication from THUMB_FROM_YEAR onwards, fetch a representative
-image from the paper URL and save it as figures/pub_NN.jpg (280×180 px).
+image and save it as figures/pub_NN.jpg (280×180 px).
 
 Image extraction strategy (in order):
-  1. arxiv URL  → download PDF → extract largest embedded image (pypdf)
-  2. Any URL    → fetch HTML  → read og:image / twitter:image
-  3. Any URL    → fetch HTML  → find linked PDF → extract figure
-  4. Direct PDF → extract largest embedded image
-  5. pdf2image  → render page 1, crop middle content strip
-  6. Placeholder (styled with venue + year)
+  1. DuckDuckGo image search on the paper title → first usable result
+  2. arxiv URL  → download PDF → extract largest embedded image (pypdf)
+  3. Any URL    → fetch HTML  → read og:image / twitter:image
+  4. Any URL    → fetch HTML  → find linked PDF → extract figure
+  5. Direct PDF → extract largest embedded image
+  6. pdf2image  → render page 1, crop middle content strip
+  7. Placeholder (styled with venue + year)
 
 Usage:
     python fetch_figures.py --cv cv.pdf --out figures [--force]
@@ -38,6 +39,12 @@ try:
 except ImportError:
     HAS_PDF2IMAGE = False
 
+try:
+    from duckduckgo_search import DDGS
+    HAS_DDGS = True
+except ImportError:
+    HAS_DDGS = False
+
 sys.path.insert(0, str(Path(__file__).parent))
 from update_pubs import extract_publications, extract_pub_urls
 
@@ -45,6 +52,8 @@ from update_pubs import extract_publications, extract_pub_urls
 THUMB_FROM_YEAR = 2016          # include thumbnails for this year and later
 THUMB_W, THUMB_H = 280, 180     # final thumbnail dimensions
 MIN_FIG_PX      = 120           # minimum side length to accept an embedded image
+MIN_IMG_W       = 100           # minimum width for image-search results
+MIN_IMG_H       = 80            # minimum height for image-search results
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 
@@ -62,6 +71,34 @@ def fetch(url, timeout=25):
     except Exception as e:
         print(f"      fetch error: {e}")
         return None, None
+
+
+# ── DuckDuckGo image search ───────────────────────────────────────────────────
+def search_image_for_title(title):
+    """Search DuckDuckGo Images for the paper title; return first usable PIL image."""
+    if not HAS_DDGS:
+        return None
+    query = f"{title} research paper"
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.images(query, max_results=8))
+        for r in results:
+            img_url = r.get("image", "")
+            if not img_url:
+                continue
+            print(f"      image search → {img_url[:90]}")
+            data, ct = fetch(img_url)
+            if not data:
+                continue
+            try:
+                pil = Image.open(io.BytesIO(data))
+                if pil.width >= MIN_IMG_W and pil.height >= MIN_IMG_H:
+                    return pil
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"      ddgs error: {e}")
+    return None
 
 
 # ── arxiv helpers ─────────────────────────────────────────────────────────────
@@ -89,7 +126,6 @@ def og_image(html_bytes, base_url):
 
 def pdf_link(html_bytes, base_url):
     html = html_bytes.decode("utf-8", errors="ignore")
-    # Look for explicit .pdf links or /pdf/ paths
     for pat in [
         r'href=["\']([^"\']*\.pdf(?:\?[^"\']*)?)["\']',
         r'href=["\']([^"\']+/pdf/[^"\']+)["\']',
@@ -136,7 +172,6 @@ def render_pdf_page(pdf_bytes):
         if pages:
             pg = pages[0]
             w, h = pg.size
-            # Skip title/authors (top 18%) and references zone (bottom 15%)
             return pg.crop((0, int(h * 0.18), w, int(h * 0.85)))
     except Exception as e:
         print(f"      pdf2image error: {e}")
@@ -144,10 +179,15 @@ def render_pdf_page(pdf_bytes):
 
 
 # ── Main per-paper logic ──────────────────────────────────────────────────────
-def get_image_for(url):
-    """Return a PIL Image or None for the given paper URL."""
+def get_image_for(title, url):
+    """Return a PIL Image or None, trying image search first then URL-based fallbacks."""
 
-    # 1 ── arxiv: go straight to PDF ──────────────────────────────────────────
+    # 1 ── DuckDuckGo image search on paper title ─────────────────────────────
+    img = search_image_for_title(title)
+    if img:
+        return img
+
+    # 2 ── arxiv: go straight to PDF ──────────────────────────────────────────
     if "arxiv.org" in url:
         pdf_url = arxiv_pdf_url(url)
         if pdf_url:
@@ -161,7 +201,7 @@ def get_image_for(url):
                 if img:
                     return img
 
-    # 2 ── direct PDF URL ─────────────────────────────────────────────────────
+    # 3 ── direct PDF URL ─────────────────────────────────────────────────────
     if url.lower().endswith(".pdf") or re.search(r'/pdf/', url, re.I):
         data, ct = fetch(url)
         if data and ("pdf" in (ct or "") or url.lower().endswith(".pdf")):
@@ -172,12 +212,12 @@ def get_image_for(url):
             if img:
                 return img
 
-    # 3 ── HTML page ───────────────────────────────────────────────────────────
+    # 4 ── HTML page ───────────────────────────────────────────────────────────
     html_data, ct = fetch(url)
     if not html_data:
         return None
 
-    # 3a: og:image / twitter:image
+    # 4a: og:image / twitter:image
     og = og_image(html_data, url)
     if og:
         print(f"      og:image → {og}")
@@ -185,13 +225,12 @@ def get_image_for(url):
         if img_data:
             try:
                 pil = Image.open(io.BytesIO(img_data))
-                # Reject tiny/generic images (< 5 KB equivalent or < 80px)
                 if pil.width >= 80 and pil.height >= 80:
                     return pil
             except Exception:
                 pass
 
-    # 3b: find linked PDF → extract figure
+    # 4b: find linked PDF → extract figure
     pdf_href = pdf_link(html_data, url)
     if pdf_href:
         print(f"      linked PDF → {pdf_href}")
@@ -218,7 +257,7 @@ def to_thumb(img):
         img   = img.crop((left, 0, left + new_w, img.height))
     else:
         new_h = int(img.width / dst_ratio)
-        top   = img.height // 6   # bias toward top (figures appear near top)
+        top   = img.height // 6
         top   = min(top, img.height - new_h)
         img   = img.crop((0, top, img.width, top + new_h))
     return img.resize((THUMB_W, THUMB_H), Image.LANCZOS)
@@ -282,7 +321,7 @@ def main():
             continue
 
         print(f"[{idx:02d}] fetch {year}  {pub['title'][:55]}")
-        img = get_image_for(url)
+        img = get_image_for(pub["title"], url)
 
         if img:
             to_thumb(img).save(dst, "JPEG", quality=85, optimize=True)
@@ -293,7 +332,7 @@ def main():
             make_placeholder(pub).save(dst, "JPEG", quality=85)
             placeholder += 1
 
-        time.sleep(1.2)   # polite pause between papers
+        time.sleep(1.5)   # polite pause between papers
 
     print(f"\nDone: {real} real  |  {placeholder} placeholder  |  {skipped} skipped")
 

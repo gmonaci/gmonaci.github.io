@@ -20,6 +20,11 @@ jobs:
         run: pip install pdfplumber pypdf pdf2image Pillow requests duckduckgo-search
       - name: Install poppler (needed by pdf2image)
         run: sudo apt-get install -y poppler-utils
+      - name: One-shot rename of legacy pub_NN thumbnails
+        # Safe to leave in place: once the renames are done this prints
+        # "Nothing to migrate" and exits 0. Delete this step and legacy.json
+        # after the first successful run if you prefer.
+        run: python update_pubs.py --migrate --legacy legacy.json --apply
       - name: Regenerate publications section in index.html
         # --min-pubs is a sanity floor: if a CV restyle breaks the parser we
         # want the action to fail loudly rather than publish a mangled page.

@@ -21,9 +21,14 @@ jobs:
       - name: Install poppler (needed by pdf2image)
         run: sudo apt-get install -y poppler-utils
       - name: Regenerate publications section in index.html
-        run: python update_pubs.py --cv cv.pdf --html index.html
+        # --min-pubs is a sanity floor: if a CV restyle breaks the parser we
+        # want the action to fail loudly rather than publish a mangled page.
+        run: python update_pubs.py --cv cv.pdf --html index.html --verbose --min-pubs 30
       - name: Fetch figures for publications (2016+)
-        run: python fetch_figures.py --cv cv.pdf --out figures --force
+        # No --force: filenames are stable now, so existing thumbnails and
+        # overrides are reused and only new papers are fetched. --prune drops
+        # thumbnails whose paper has left the CV.
+        run: python fetch_figures.py --cv cv.pdf --out figures --prune
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"

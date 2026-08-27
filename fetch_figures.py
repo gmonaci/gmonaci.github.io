@@ -46,7 +46,7 @@ except ImportError:
     HAS_DDGS = False
 
 sys.path.insert(0, str(Path(__file__).parent))
-from update_pubs import extract_publications, extract_pub_urls
+from update_pubs import extract_publications, assign_keys, REGISTRY_PATH
 
 # ── Config ────────────────────────────────────────────────────────────────────
 THUMB_FROM_YEAR = 2016          # include thumbnails for this year and later
@@ -295,6 +295,10 @@ def main():
     parser.add_argument("--overrides", default="figures/overrides",
                         help="Folder of manually-supplied images (pub_NN.{jpg,png,…})")
     parser.add_argument("--force",     action="store_true", help="Re-fetch even if file exists")
+    parser.add_argument("--registry",  default=REGISTRY_PATH,
+                        help="Slug registry JSON written by update_pubs.py")
+    parser.add_argument("--prune",     action="store_true",
+                        help="Delete pub_*.jpg files no longer referenced by any paper")
     args = parser.parse_args()
 
     cv_path       = Path(args.cv)
@@ -303,41 +307,38 @@ def main():
     out_dir.mkdir(exist_ok=True)
 
     pubs = extract_publications(cv_path)
-    urls = extract_pub_urls(cv_path)
-    n    = min(len(pubs), len(urls))
+    n    = len(pubs)
 
-    # ── Index assignment: oldest paper = pub_01, newest = pub_NN ─────────────
-    # This way adding a new (recent) paper gets the next number and existing
-    # override filenames never shift.
-    thumb_eligible = [i for i in range(n) if pubs[i]["year"] >= THUMB_FROM_YEAR]
-    total_thumb    = len(thumb_eligible)
-    # pubs are newest-first in the CV, so position 0 = newest → highest index
-    thumb_idx = {i: total_thumb - pos for pos, i in enumerate(thumb_eligible)}
+    # ── Stable per-paper slugs ───────────────────────────────────────────────
+    # Filenames are figures/pub_<slug>.jpg, where the slug is minted once and
+    # recorded in the registry. Position in the CV is irrelevant, so reordering
+    # or inserting papers never reshuffles thumbnails or orphans an override.
+    # update_pubs.py owns the registry; we read it so the HTML and the figures
+    # can never disagree.
+    keys = assign_keys(pubs, args.registry, write=True)
 
     # Image-format extensions to check in the overrides folder
     OVERRIDE_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif"]
 
-    def find_override(idx: int) -> Path | None:
-        # Accept both zero-padded (pub_03.png) and plain (pub_3.png)
-        for name in [f"pub_{idx:02d}", f"pub_{idx}"]:
-            for ext in OVERRIDE_EXTS:
-                p = overrides_dir / f"{name}{ext}"
-                if p.exists():
-                    return p
+    def find_override(key: str) -> Path | None:
+        for ext in OVERRIDE_EXTS:
+            p = overrides_dir / f"pub_{key}{ext}"
+            if p.exists():
+                return p
         return None
 
     real = placeholder = skipped = overridden = 0
 
     for i in range(n):
         pub  = pubs[i]
-        url  = urls[i]
+        url  = pub["url"]
         year = pub["year"]
 
-        if year < THUMB_FROM_YEAR:
+        if year < THUMB_FROM_YEAR or i not in keys:
             continue
 
-        idx = thumb_idx[i]
-        dst = out_dir / f"pub_{idx:02d}.jpg"
+        idx = keys[i]
+        dst = out_dir / f"pub_{idx}.jpg"
 
         # ── manual override wins unconditionally ──────────────────────────────
         override_path = find_override(idx)
@@ -345,19 +346,19 @@ def main():
             try:
                 img = Image.open(override_path)
                 to_thumb(img).save(dst, "JPEG", quality=85, optimize=True)
-                print(f"[{idx:02d}] override ({override_path.suffix})  {year}  {pub['title'][:50]}")
+                print(f"[{idx}] override ({override_path.suffix})  {year}  {pub['title'][:50]}")
                 overridden += 1
             except Exception as e:
-                print(f"[{idx:02d}] override error: {e} — skipping")
+                print(f"[{idx}] override error: {e} — skipping")
             continue
 
         # ── skip if already fetched (unless --force) ──────────────────────────
         if dst.exists() and not args.force:
-            print(f"[{idx:02d}] skip  {year}  {pub['title'][:55]}")
+            print(f"[{idx}] skip  {year}  {pub['title'][:55]}")
             skipped += 1
             continue
 
-        print(f"[{idx:02d}] fetch {year}  {pub['title'][:55]}")
+        print(f"[{idx}] fetch {year}  {pub['title'][:55]}")
         img = get_image_for(pub["title"], url)
 
         if img:
@@ -371,8 +372,15 @@ def main():
 
         time.sleep(1.5)   # polite pause between papers
 
+    if args.prune:
+        wanted = {f"pub_{k}.jpg" for k in keys.values()}
+        for stale in sorted(out_dir.glob("pub_*.jpg")):
+            if stale.name not in wanted:
+                print(f"      prune {stale.name}")
+                stale.unlink()
+
     print(f"\nDone: {overridden} override  |  {real} fetched  |  {placeholder} placeholder  |  {skipped} skipped")
-    print(f"      (pub_01 = oldest eligible paper, pub_{total_thumb:02d} = newest)")
+    print(f"      ({len(keys)} papers with thumbnails; slugs recorded in {args.registry})")
 
 
 if __name__ == "__main__":

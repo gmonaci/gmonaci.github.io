@@ -19,29 +19,13 @@ jobs:
       - name: Install Python dependencies
         run: pip install pdfplumber pypdf pdf2image Pillow requests duckduckgo-search
       - name: Install poppler (needed by pdf2image)
-        run: sudo apt-get install -y poppler-utils
-      - name: One-shot fix of a mis-assigned override
-        # DELETE THIS STEP after it has run once.
-        # The old pub_10.png was the image-goal paper's figure, not the
-        # Compressing paper's. Move it to the right slug and drop both stale
-        # thumbnails so one is rebuilt from the override and the other refetched.
-        run: |
-          OLD=figures/overrides/pub_compressing-observation-history-into.png
-          NEW=figures/overrides/pub_what-does-really-matter-in-image-goal.png
-          if [ -f "$OLD" ]; then
-            git mv "$OLD" "$NEW"
-            rm -f figures/pub_compressing-observation-history-into.jpg
-            rm -f figures/pub_what-does-really-matter-in-image-goal.jpg
-            echo "moved override to $NEW"
-          else
-            echo "already fixed, nothing to do"
-          fi
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
       - name: Regenerate publications section in index.html
         # --min-pubs is a sanity floor: if a CV restyle breaks the parser we
         # want the action to fail loudly rather than publish a mangled page.
         run: python update_pubs.py --cv cv.pdf --html index.html --verbose --min-pubs 30
       - name: Fetch figures for publications (2016+)
-        # No --force: filenames are stable now, so existing thumbnails and
+        # No --force: thumbnail filenames are stable, so existing figures and
         # overrides are reused and only new papers are fetched. --prune drops
         # thumbnails whose paper has left the CV.
         run: python fetch_figures.py --cv cv.pdf --out figures --prune

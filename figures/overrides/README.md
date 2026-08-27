@@ -22,4 +22,4 @@ The workflow picks it up on the next run — no `--force` needed, overrides alwa
 | `pub_07.jpg` | 2025 | International Conference on Robot and Human Interactive Communication (RO-MAN) 2025 | Robots waiting for the elevator: Integrating social norms in a low-data regime goal selection problem |
 | `pub_08.jpg` | 2025 | The Thirty-Ninth Annual Conference on Neural Information Processing Systems (NeurIPS) 2025 | Kinaema: a recurrent sequence model for memory and pose in motion |
 | `pub_09.jpg` | 2025 | Transactions on Machine Learning Research (TMLR) 2025 | RANa: Retrieval-Augmented Navigation |
-| `pub_10.jpg` | 2026 | International Conference on 3D Vision (3DV) 2026 | What does really matter in image goal navigation? |
+| `pub_10.jpg` | 2026 | International Conference on 3D Vision (3DV) 2026 | Compressing Observation History into Agent Memory: Distilling Transformers into Recurrent Transformers |

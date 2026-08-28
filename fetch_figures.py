@@ -47,6 +47,7 @@ except ImportError:
 
 sys.path.insert(0, str(Path(__file__).parent))
 from update_pubs import extract_publications, assign_keys, REGISTRY_PATH
+from figure_one import extract_figure_one
 
 # ── Config ────────────────────────────────────────────────────────────────────
 THUMB_FROM_YEAR = 2016          # include thumbnails for this year and later
@@ -179,38 +180,57 @@ def render_pdf_page(pdf_bytes):
 
 
 # ── Main per-paper logic ──────────────────────────────────────────────────────
-def get_image_for(title, url):
-    """Return a PIL Image or None, trying image search first then URL-based fallbacks."""
+def image_from_pdf_bytes(data):
+    """Best image we can get out of a paper PDF, in decreasing order of quality.
 
-    # 1 ── DuckDuckGo image search on paper title ─────────────────────────────
-    img = search_image_for_title(title)
+    Figure 1 first: it is the paper's own teaser, so it is nearly always the
+    most representative thumbnail. Only if the caption can't be located do we
+    fall back to guessing at embedded rasters or cropping the page.
+    """
+    img = extract_figure_one(data)
     if img:
+        print("      figure 1 (caption-anchored)")
         return img
+    img = figures_from_pdf(data)
+    if img:
+        print("      largest embedded image")
+        return img
+    img = render_pdf_page(data)
+    if img:
+        print("      page 1 crop")
+    return img
 
-    # 2 ── arxiv: go straight to PDF ──────────────────────────────────────────
+
+def get_image_for(title, url):
+    """Return a PIL Image or None.
+
+    The paper's own PDF is tried before web image search: Figure 1 is a far
+    better thumbnail than whatever a search engine associates with the title.
+    """
+
+    # 1 ── arxiv: go straight to the PDF and pull Figure 1 ────────────────────
     if "arxiv.org" in url:
         pdf_url = arxiv_pdf_url(url)
         if pdf_url:
             print(f"      arxiv PDF → {pdf_url}")
             data, ct = fetch(pdf_url)
             if data:
-                img = figures_from_pdf(data)
-                if img:
-                    return img
-                img = render_pdf_page(data)
+                img = image_from_pdf_bytes(data)
                 if img:
                     return img
 
-    # 3 ── direct PDF URL ─────────────────────────────────────────────────────
+    # 2 ── direct PDF URL ─────────────────────────────────────────────────────
     if url.lower().endswith(".pdf") or re.search(r'/pdf/', url, re.I):
         data, ct = fetch(url)
         if data and ("pdf" in (ct or "") or url.lower().endswith(".pdf")):
-            img = figures_from_pdf(data)
+            img = image_from_pdf_bytes(data)
             if img:
                 return img
-            img = render_pdf_page(data)
-            if img:
-                return img
+
+    # 3 ── DuckDuckGo image search on paper title ─────────────────────────────
+    img = search_image_for_title(title)
+    if img:
+        return img
 
     # 4 ── HTML page ───────────────────────────────────────────────────────────
     html_data, ct = fetch(url)
